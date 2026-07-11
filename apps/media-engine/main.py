@@ -1,8 +1,9 @@
 """SANTUARIO media-engine — servicio Python para audio, subtítulos y montaje.
 
 Fase 3: TTS (edge-tts), transcripción palabra-por-palabra (faster-whisper) y
-subtítulos ASS con burn-in FFmpeg, todos reales. Fase 4 (montaje/concat y
-último-frame) sigue como stub.
+subtítulos ASS con burn-in FFmpeg. Fase 4: extracción de último frame
+(continuidad), concatenación de tomas (montaje) y QA visual (paleta
+dominante). Todo real, sin stubs.
 """
 
 import importlib.util
@@ -16,8 +17,16 @@ from fastapi import FastAPI, HTTPException
 import tts as tts_mod
 import transcribe as transcribe_mod
 import subtitles as subtitles_mod
+import render as render_mod
+import qa as qa_mod
 from models import (
+    ConcatRequest,
+    ConcatResponse,
+    LastFrameRequest,
+    LastFrameResponse,
     PresetInfo,
+    QACompararRequest,
+    QACompararResponse,
     SubtitlesAssRequest,
     SubtitlesAssResponse,
     SubtitlesRenderRequest,
@@ -132,18 +141,34 @@ def subtitles_render(req: SubtitlesRenderRequest) -> SubtitlesRenderResponse:
     return SubtitlesRenderResponse(path=salida_path, preset=req.preset)
 
 
-# ---------- Stubs Fase 4 ----------
+@app.post("/render/concat", response_model=ConcatResponse)
+def render_concat(req: ConcatRequest) -> ConcatResponse:
+    nombre = req.output_name or f"montaje_{uuid.uuid4().hex}"
+    salida = os.path.join(STORAGE_DIR, "montaje", f"{nombre}.mp4")
+    try:
+        render_mod.concatenar_tomas(req.video_paths, salida, req.normalizar_loudness)
+    except RuntimeError as err:
+        raise HTTPException(status_code=502, detail=str(err)) from err
+    return ConcatResponse(path=salida)
 
 
-@app.post("/render/concat")
-def render_concat() -> None:
-    """Fase 4: concatenación de tomas, transiciones, mezcla y loudness."""
-    raise HTTPException(status_code=501, detail="Se implementa en Fase 4 (montaje).")
+@app.post("/frames/last", response_model=LastFrameResponse)
+def last_frame(req: LastFrameRequest) -> LastFrameResponse:
+    nombre = req.output_name or f"frame_{uuid.uuid4().hex}"
+    salida = os.path.join(STORAGE_DIR, "frames", f"{nombre}.jpg")
+    try:
+        render_mod.extraer_ultimo_frame(req.video_path, salida)
+    except RuntimeError as err:
+        raise HTTPException(status_code=502, detail=str(err)) from err
+    return LastFrameResponse(path=salida)
 
 
-@app.post("/frames/last")
-def last_frame() -> None:
-    """Fase 4: extrae el frame final de una toma para encadenar la siguiente."""
-    raise HTTPException(
-        status_code=501, detail="Se implementa en Fase 4 (continuidad último-frame)."
-    )
+@app.post("/qa/comparar", response_model=QACompararResponse)
+def qa_comparar(req: QACompararRequest) -> QACompararResponse:
+    try:
+        paleta_a = qa_mod.extraer_paleta(req.frame_a_path, req.n_colores)
+        paleta_b = qa_mod.extraer_paleta(req.frame_b_path, req.n_colores)
+    except (FileNotFoundError, OSError) as err:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer un frame: {err}") from err
+    similitud = qa_mod.similitud_paletas(paleta_a, paleta_b)
+    return QACompararResponse(paleta_a=paleta_a, paleta_b=paleta_b, similitud=similitud)

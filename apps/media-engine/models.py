@@ -63,3 +63,34 @@ class SubtitlesRenderResponse(BaseModel):
 class PresetInfo(BaseModel):
     nombre: str
     descripcion: str
+
+
+class LastFrameRequest(BaseModel):
+    video_path: str
+    output_name: str | None = None
+
+
+class LastFrameResponse(BaseModel):
+    path: str
+
+
+class ConcatRequest(BaseModel):
+    video_paths: list[str] = Field(min_length=1)
+    output_name: str | None = None
+    normalizar_loudness: bool = True
+
+
+class ConcatResponse(BaseModel):
+    path: str
+
+
+class QACompararRequest(BaseModel):
+    frame_a_path: str
+    frame_b_path: str
+    n_colores: int = 5
+
+
+class QACompararResponse(BaseModel):
+    paleta_a: list[str]
+    paleta_b: list[str]
+    similitud: float
