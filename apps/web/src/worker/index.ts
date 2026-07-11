@@ -1,12 +1,14 @@
 import { Worker, type Job } from "bullmq";
-import { COLAS } from "@santuario/shared";
+import { COLAS, type NombreCola } from "@santuario/shared";
+import { procesarGenerar } from "./procesar-generar";
+import { prisma } from "../lib/db";
 
 /**
  * Worker Node de BullMQ — proceso separado de Next.js.
  * Arranque: `pnpm worker` (o `pnpm --filter @santuario/web worker` desde la raíz).
  *
- * Fase 0: procesadores placeholder que validan el circuito cola→worker.
- * Fase 2+: generación de video, TTS, subtítulos y montaje reales.
+ * Fase 2: "generar" tiene procesador real (Higgsfield). tts/subtitulos/
+ * montaje siguen siendo placeholder hasta las fases 3 y 4.
  */
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 const connection = { url: REDIS_URL };
@@ -17,9 +19,16 @@ async function procesarPlaceholder(job: Job): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
+const procesadores: Record<NombreCola, (job: Job) => Promise<unknown>> = {
+  generar: procesarGenerar,
+  tts: procesarPlaceholder,
+  subtitulos: procesarPlaceholder,
+  montaje: procesarPlaceholder,
+};
+
 const workers = Object.values(COLAS).map(
   (cola) =>
-    new Worker(cola, procesarPlaceholder, {
+    new Worker(cola, procesadores[cola], {
       connection,
       concurrency: cola === "generar" ? 4 : 2,
     })
@@ -29,9 +38,24 @@ for (const worker of workers) {
   worker.on("completed", (job) =>
     console.log(`[worker] ✅ ${worker.name}#${job.id} completado`)
   );
-  worker.on("failed", (job, err) =>
-    console.error(`[worker] ❌ ${worker.name}#${job?.id} falló:`, err.message)
-  );
+  worker.on("failed", async (job, err) => {
+    console.error(`[worker] ❌ ${worker.name}#${job?.id} falló:`, err.message);
+    const agotado = job && job.attemptsMade >= (job.opts.attempts ?? 1);
+    if (agotado && worker.name === "generar") {
+      const takeId = (job?.data as { takeId?: string })?.takeId;
+      if (takeId) {
+        await prisma.agentLog
+          .create({
+            data: {
+              agente: "generador",
+              decision: `Job "generar" agotó reintentos para take ${takeId}`,
+              contexto: { takeId, error: err.message },
+            },
+          })
+          .catch(() => {});
+      }
+    }
+  });
 }
 
 console.log(
