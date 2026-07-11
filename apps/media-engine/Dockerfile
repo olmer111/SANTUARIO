@@ -1,6 +1,29 @@
+# --- Etapa "fonts": fuentes DejaVu (Sans/Serif) vía pip (paquete matplotlib,
+# que las empaqueta), SIN necesitar apt/fontconfig del sistema. libass las
+# usa directamente por directorio (fontsdir=), así que solo copiamos los
+# .ttf al stage final — matplotlib no viaja a la imagen final.
+FROM mirror.gcr.io/library/python:3.11-slim AS fonts
+# misma CA opcional que la etapa final — cada etapa de build es un contexto
+# de red aparte, así que esto tiene que repetirse aquí.
+COPY ca-bundle*.crt /tmp/build/
+RUN if [ -f /tmp/build/ca-bundle.crt ]; then \
+      cp /tmp/build/ca-bundle.crt /usr/local/share/ca-certificates/egress-ca.crt \
+      && update-ca-certificates; \
+    fi
+ENV PIP_CERT=/etc/ssl/certs/ca-certificates.crt \
+    REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+RUN pip install --no-cache-dir matplotlib \
+    && mkdir -p /fonts \
+    && cp /usr/local/lib/python3.11/site-packages/matplotlib/mpl-data/fonts/ttf/DejaVuSans*.ttf /fonts/ \
+    && cp /usr/local/lib/python3.11/site-packages/matplotlib/mpl-data/fonts/ttf/DejaVuSerif*.ttf /fonts/
+
 # mirror.gcr.io replica las imágenes oficiales de Docker Hub (evita límites
 # de rate y CDNs bloqueados en algunos entornos); la imagen es idéntica.
 FROM mirror.gcr.io/library/python:3.11-slim
+
+COPY --from=fonts /fonts /fonts
+ENV FONTS_DIR=/fonts
 
 # CA opcional para entornos con proxy de egreso que re-termina TLS (CI/sandbox).
 # Si no existe ca-bundle.crt en el contexto, el wildcard no copia nada.

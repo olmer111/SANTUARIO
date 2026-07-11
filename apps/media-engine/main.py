@@ -1,20 +1,37 @@
 """SANTUARIO media-engine — servicio Python para audio, subtítulos y montaje.
 
-Fase 0: healthcheck real (FFmpeg, edge-tts, faster-whisper) + stubs de los
-endpoints que se implementan en Fase 3 (TTS, transcripción palabra-por-palabra,
-render de subtítulos ASS) y Fase 4 (montaje/concatenación).
+Fase 3: TTS (edge-tts), transcripción palabra-por-palabra (faster-whisper) y
+subtítulos ASS con burn-in FFmpeg, todos reales. Fase 4 (montaje/concat y
+último-frame) sigue como stub.
 """
 
 import importlib.util
 import os
 import shutil
 import subprocess
+import uuid
 
 from fastapi import FastAPI, HTTPException
 
+import tts as tts_mod
+import transcribe as transcribe_mod
+import subtitles as subtitles_mod
+from models import (
+    PresetInfo,
+    SubtitlesAssRequest,
+    SubtitlesAssResponse,
+    SubtitlesRenderRequest,
+    SubtitlesRenderResponse,
+    TranscribeRequest,
+    TranscribeResponse,
+    TTSRequest,
+    TTSResponse,
+)
+from presets import listar_presets
+
 app = FastAPI(
     title="SANTUARIO media-engine",
-    version="0.1.0",
+    version="0.3.0",
     description="TTS (edge-tts), subtítulos (faster-whisper + ASS) y montaje (FFmpeg).",
 )
 
@@ -45,33 +62,77 @@ def health() -> dict:
         "estado": "ok" if ffmpeg else "degradado",
         "ffmpeg": ffmpeg,
         "edge_tts": _modulo_disponible("edge_tts"),
-        # faster-whisper se instala en Fase 3 (subtítulos palabra por palabra)
         "faster_whisper": _modulo_disponible("faster_whisper"),
         "storage_escribible": os.access(STORAGE_DIR, os.W_OK),
     }
 
 
-# ---------- Stubs Fase 3/4 (documentan el contrato; devuelven 501) ----------
+@app.get("/subtitles/presets", response_model=list[PresetInfo])
+def subtitles_presets() -> list[PresetInfo]:
+    return [PresetInfo(nombre=p.nombre, descripcion=p.descripcion) for p in listar_presets()]
 
 
-@app.post("/tts")
-def tts() -> None:
-    """Fase 3: texto → audio con edge-tts (voz, velocidad, tono, pausas)."""
-    raise HTTPException(status_code=501, detail="Se implementa en Fase 3 (edge-tts).")
+@app.post("/tts", response_model=TTSResponse)
+async def tts(req: TTSRequest) -> TTSResponse:
+    nombre = req.output_name or f"tts_{uuid.uuid4().hex}"
+    ruta = os.path.join(STORAGE_DIR, "audio", f"{nombre}.mp3")
+    try:
+        duracion = await tts_mod.generar_tts(req.text, req.voice, req.rate, req.pitch, ruta)
+    except Exception as err:  # edge-tts lanza excepciones variadas de red/voz
+        raise HTTPException(status_code=502, detail=f"edge-tts falló: {err}") from err
+    return TTSResponse(path=ruta, duracion_seg=duracion)
 
 
-@app.post("/transcribe")
-def transcribe() -> None:
-    """Fase 3: audio → timestamps palabra por palabra con faster-whisper."""
-    raise HTTPException(
-        status_code=501, detail="Se implementa en Fase 3 (faster-whisper)."
-    )
+@app.post("/transcribe", response_model=TranscribeResponse)
+def transcribe(req: TranscribeRequest) -> TranscribeResponse:
+    if not _modulo_disponible("faster_whisper"):
+        raise HTTPException(
+            status_code=503,
+            detail="faster-whisper no está instalado (descomentar en requirements.txt)",
+        )
+    try:
+        palabras, idioma, texto = transcribe_mod.transcribir(req.audio_path, req.idioma)
+    except Exception as err:
+        raise HTTPException(status_code=502, detail=f"faster-whisper falló: {err}") from err
+    return TranscribeResponse(words=palabras, idioma=idioma, texto=texto)
 
 
-@app.post("/subtitles/render")
-def subtitles_render() -> None:
-    """Fase 3: timestamps + preset → subtítulos ASS quemados con FFmpeg."""
-    raise HTTPException(status_code=501, detail="Se implementa en Fase 3 (ASS/FFmpeg).")
+@app.post("/subtitles/ass", response_model=SubtitlesAssResponse)
+def subtitles_ass(req: SubtitlesAssRequest) -> SubtitlesAssResponse:
+    try:
+        contenido = subtitles_mod.generar_ass(
+            req.words, req.preset, req.video_width, req.video_height
+        )
+    except KeyError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+    return SubtitlesAssResponse(ass=contenido)
+
+
+@app.post("/subtitles/render", response_model=SubtitlesRenderResponse)
+def subtitles_render(req: SubtitlesRenderRequest) -> SubtitlesRenderResponse:
+    try:
+        contenido = subtitles_mod.generar_ass(req.words, req.preset)
+    except KeyError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+
+    nombre = req.output_name or f"subs_{uuid.uuid4().hex}"
+    ass_path = os.path.join(STORAGE_DIR, "subtitles", f"{nombre}.ass")
+    salida_path = os.path.join(STORAGE_DIR, "subtitles", f"{nombre}.mp4")
+    os.makedirs(os.path.dirname(ass_path), exist_ok=True)
+    with open(ass_path, "w", encoding="utf-8") as f:
+        f.write(contenido)
+
+    try:
+        subtitles_mod.quemar_subtitulos(
+            req.video_path, ass_path, salida_path, req.audio_path
+        )
+    except RuntimeError as err:
+        raise HTTPException(status_code=502, detail=str(err)) from err
+
+    return SubtitlesRenderResponse(path=salida_path, preset=req.preset)
+
+
+# ---------- Stubs Fase 4 ----------
 
 
 @app.post("/render/concat")
