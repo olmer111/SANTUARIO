@@ -54,7 +54,7 @@ Ver [`scripts/setup-skills.sh`](scripts/setup-skills.sh). División del trabajo:
 | Fase | Entregable | Estado |
 |---|---|---|
 | **0 — Fundaciones** | Monorepo, Next.js + Prisma, Redis + BullMQ, media-engine, compose con healthchecks | ✅ |
-| **1 — Cerebro** | Entrevistador + Guionista + storyboard persistido | ⏳ |
+| **1 — Cerebro** | Entrevistador + Guionista + storyboard persistido (`/estudio`) | ✅ |
 | **2 — Primer video real** | ADN de Estilo + primer adaptador (Higgsfield) | ⏳ |
 | **3 — Audio y subtítulos** | edge-tts + faster-whisper + presets ASS + previews | ⏳ |
 | **4 — Escala y consistencia** | Multi-proveedor, fallback, último-frame, QA automático | ⏳ |

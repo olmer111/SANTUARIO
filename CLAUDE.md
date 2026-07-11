@@ -7,7 +7,7 @@ reglas duras del ADN de Estilo, el pipeline y el plan de fases.
 ## Estado de fases
 
 - ✅ Fase 0 — Fundaciones (monorepo, Next.js+Prisma, BullMQ, media-engine, compose)
-- ⏳ Fase 1 — Cerebro (Entrevistador + Guionista + storyboard)
+- ✅ Fase 1 — Cerebro (Entrevistador + Guionista + storyboard, cerebro NVIDIA NIM)
 - ⏳ Fase 2 — Primer video real (ADN + adaptador Higgsfield)
 - ⏳ Fase 3 — Audio y subtítulos (edge-tts, faster-whisper, ASS)
 - ⏳ Fase 4 — Escala y consistencia (multi-proveedor, último-frame, QA)
@@ -19,6 +19,10 @@ reglas duras del ADN de Estilo, el pipeline y el plan de fases.
   Higgsfield; el MCP de Higgsfield puede estar disponible en la sesión).
 - GPU local: **no** — solo proveedores en la nube; sin ComfyUI local.
 - Nombre definitivo: **SANTUARIO**.
+- Cerebro de agentes: **NVIDIA NIM** (`NVIDIA_API_KEY` en `.env`), no
+  Anthropic — decisión del usuario por costo cero (sección 13, regla 4).
+  `ANTHROPIC_API_KEY` queda como alternativa opcional de mayor calidad
+  (`LLM_PROVIDER=anthropic`).
 
 ## Comandos
 
@@ -52,3 +56,9 @@ pnpm build                   # build completo
   `cp /root/.ccr/ca-bundle.crt apps/media-engine/ca-bundle.crt` (gitignorado).
 - Los 5 skills de diseño están vendorizados en `.claude/skills/` (ver
   `scripts/setup-skills.sh`). Antes de construir UI real: úsalos.
+- `integrate.api.nvidia.com` (y otros hosts de LLM como Groq/OpenRouter) NO
+  están en la lista blanca de egress del sandbox → las rutas `/api/entrevista`
+  y `/api/guion` no se pueden probar en vivo aquí (sí devuelven 502 con el
+  mensaje de error correcto). `generativelanguage.googleapis.com` sí es
+  alcanzable, por si se agrega Gemini como alternativa. Verificar la llamada
+  real fuera del sandbox.
