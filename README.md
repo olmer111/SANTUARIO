@@ -55,7 +55,7 @@ Ver [`scripts/setup-skills.sh`](scripts/setup-skills.sh). División del trabajo:
 |---|---|---|
 | **0 — Fundaciones** | Monorepo, Next.js + Prisma, Redis + BullMQ, media-engine, compose con healthchecks | ✅ |
 | **1 — Cerebro** | Entrevistador + Guionista + storyboard persistido (`/estudio`) | ✅ |
-| **2 — Primer video real** | ADN de Estilo + primer adaptador (Higgsfield) | ⏳ |
+| **2 — Primer video real** | ADN de Estilo + adaptador Higgsfield + Take end-to-end | ✅ |
 | **3 — Audio y subtítulos** | edge-tts + faster-whisper + presets ASS + previews | ⏳ |
 | **4 — Escala y consistencia** | Multi-proveedor, fallback, último-frame, QA automático | ⏳ |
 | **5 — Producto** | UI completa con los 5 skills, biblioteca de ADN, montaje, export | ⏳ |

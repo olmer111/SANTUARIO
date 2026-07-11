@@ -8,7 +8,7 @@ reglas duras del ADN de Estilo, el pipeline y el plan de fases.
 
 - ✅ Fase 0 — Fundaciones (monorepo, Next.js+Prisma, BullMQ, media-engine, compose)
 - ✅ Fase 1 — Cerebro (Entrevistador + Guionista + storyboard, cerebro NVIDIA NIM)
-- ⏳ Fase 2 — Primer video real (ADN + adaptador Higgsfield)
+- ✅ Fase 2 — Primer video real (ADN + adaptador Higgsfield, sin credenciales aún)
 - ⏳ Fase 3 — Audio y subtítulos (edge-tts, faster-whisper, ASS)
 - ⏳ Fase 4 — Escala y consistencia (multi-proveedor, último-frame, QA)
 - ⏳ Fase 5 — Producto (UI completa con los 5 skills de diseño)
@@ -62,3 +62,11 @@ pnpm build                   # build completo
   mensaje de error correcto). `generativelanguage.googleapis.com` sí es
   alcanzable, por si se agrega Gemini como alternativa. Verificar la llamada
   real fuera del sandbox.
+- `platform.higgsfield.ai` tampoco está en la lista blanca → mismo patrón:
+  el adaptador llega hasta la llamada HTTP real y falla limpio (502). El
+  usuario todavía no tiene `HIGGSFIELD_API_KEY` (formato `KEY_ID:KEY_SECRET`
+  del dashboard). El endpoint de texto→imagen (`/v1/text2image/soul`) no
+  está 100% confirmado en documentación pública — solo `/v1/image2video/dop`
+  y el patrón de auth lo están (ver comentarios en
+  `apps/web/src/lib/providers/higgsfield.ts`); verificar contra el dashboard
+  real antes de asumir que funciona en producción.
