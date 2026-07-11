@@ -10,7 +10,7 @@ reglas duras del ADN de Estilo, el pipeline y el plan de fases.
 - ✅ Fase 1 — Cerebro (Entrevistador + Guionista + storyboard, cerebro NVIDIA NIM)
 - ✅ Fase 2 — Primer video real (ADN + adaptador Higgsfield, sin credenciales aún)
 - ✅ Fase 3 — Audio y subtítulos (edge-tts, faster-whisper, ASS, sin red en sandbox)
-- ⏳ Fase 4 — Escala y consistencia (multi-proveedor, último-frame, QA)
+- ✅ Fase 4 — Escala y consistencia (Director, último-frame, QA, fallback — verificado con proveedor simulado)
 - ⏳ Fase 5 — Producto (UI completa con los 5 skills de diseño)
 
 ## Contexto del usuario (respuestas a la entrevista inicial)
@@ -83,3 +83,17 @@ pnpm build                   # build completo
   `apps/media-engine/Dockerfile`), el texto queda invisible aunque FFmpeg
   termine con éxito y sin errores. Ya está resuelto, pero es la clase de
   bug que no se nota sin extraer un frame y mirarlo.
+- El Director (Fase 4) se verificó de punta a punta con un `VideoProvider`
+  simulado registrado temporalmente detrás de `MOCK_PROVIDER=1` (generaba
+  clips reales con FFmpeg vía `docker exec`, sin red externa) — probé el
+  camino feliz (3 escenas, continuidad por último frame, similitud 1.00,
+  montaje final) y el camino de escalación (drift forzado, 3 intentos,
+  mensaje claro al usuario). Encontré y arreglé un bug real en el proceso:
+  un fallo de QA (drift de contenido) contaba como fallo de proveedor en
+  `ProviderRegistry`, así que con un solo proveedor registrado el segundo
+  intento fallido lo excluía por completo (`fallosConsecutivos >= 2`) antes
+  de llegar al tercer intento, produciendo un error genérico en vez de la
+  escalación real. `registrarResultado` ahora solo se llama para fallos de
+  API/red, nunca para fallos de QA. El código de prueba (proveedor
+  simulado + su registro condicional) se revirtió por completo antes de
+  commitear — no queda rastro en el diff.
