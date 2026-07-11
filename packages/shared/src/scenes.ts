@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { StyleDNASchema } from "./style-dna.js";
+import { StyleDNASchema } from "./style-dna";
 
 export const FormatoSchema = z.enum(["9:16", "16:9", "1:1"]);
 export type Formato = z.infer<typeof FormatoSchema>;
