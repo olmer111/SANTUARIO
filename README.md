@@ -58,4 +58,4 @@ Ver [`scripts/setup-skills.sh`](scripts/setup-skills.sh). División del trabajo:
 | **2 — Primer video real** | ADN de Estilo + adaptador Higgsfield + Take end-to-end | ✅ |
 | **3 — Audio y subtítulos** | edge-tts + faster-whisper + presets ASS + previews | ✅ |
 | **4 — Escala y consistencia** | Multi-proveedor (Higgsfield + fal.ai), fallback, último-frame, QA automático, Director | ✅ |
-| **5 — Producto** | UI completa con los 5 skills, biblioteca de ADN, montaje, export | ⏳ |
+| **5 — Producto** | Dashboard, Estudio, biblioteca de ADN, storyboard/montaje/export | ✅ |

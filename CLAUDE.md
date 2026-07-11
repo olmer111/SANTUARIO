@@ -11,7 +11,7 @@ reglas duras del ADN de Estilo, el pipeline y el plan de fases.
 - ✅ Fase 2 — Primer video real (ADN + adaptador Higgsfield, sin credenciales aún)
 - ✅ Fase 3 — Audio y subtítulos (edge-tts, faster-whisper, ASS, sin red en sandbox)
 - ✅ Fase 4 — Escala y consistencia (Director, último-frame, QA, fallback — verificado con proveedor simulado)
-- ⏳ Fase 5 — Producto (UI completa con los 5 skills de diseño)
+- ✅ Fase 5 — Producto (Dashboard, Estudio, ADN, Storyboard/Montaje/Export, design system propio)
 
 ## Contexto del usuario (respuestas a la entrevista inicial)
 
@@ -56,6 +56,18 @@ pnpm build                   # build completo
   `cp /root/.ccr/ca-bundle.crt apps/media-engine/ca-bundle.crt` (gitignorado).
 - Los 5 skills de diseño están vendorizados en `.claude/skills/` (ver
   `scripts/setup-skills.sh`). Antes de construir UI real: úsalos.
+- Design system real (Fase 5): tema "sala de grading" — canvas oscuro cálido
+  (no negro puro), acentos tungsteno (ámbar, acciones) + scope (teal,
+  lecturas técnicas), tipografía Space Grotesk (display) + Inter (body) +
+  JetBrains Mono (todo dato técnico: seeds, ids, similitud QA — contenido
+  real que ya se muestra en cada pantalla). Tokens en
+  `apps/web/src/app/globals.css`, primitivos en
+  `apps/web/src/components/ui/`. Verificado con capturas reales de
+  Playwright y contraste WCAG calculado a mano (`--ink-faint` se ajustó de
+  3.25:1 a 5.2:1 tras el cálculo).
+- La cola en vivo del Dashboard (sección 11, pantalla 1) usa polling cada
+  5s en vez de SSE — decisión pragmática de alcance, funcionalmente
+  equivalente para el usuario.
 - `integrate.api.nvidia.com` (y otros hosts de LLM como Groq/OpenRouter) NO
   están en la lista blanca de egress del sandbox → las rutas `/api/entrevista`
   y `/api/guion` no se pueden probar en vivo aquí (sí devuelven 502 con el
