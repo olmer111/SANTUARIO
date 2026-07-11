@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   Brief,
   ChatMessage,
@@ -25,6 +25,27 @@ interface TakeEstado {
   notasQa: string;
 }
 
+interface Voz {
+  id: string;
+  nombre: string;
+  idioma: string;
+  voiceId: string;
+}
+
+interface SubtitlePresetInfo {
+  id: string;
+  nombre: string;
+  config: { descripcion?: string };
+}
+
+interface RenderJobEstado {
+  id: string;
+  estado: string;
+  progreso: number;
+  error: string | null;
+  url: string | null;
+}
+
 export default function EstudioPage() {
   const [fase, setFase] = useState<Fase>("entrevista");
   const [historial, setHistorial] = useState<ChatMessage[]>([]);
@@ -43,6 +64,91 @@ export default function EstudioPage() {
   const [descripcionEstilo, setDescripcionEstilo] = useState("");
   const [adn, setAdn] = useState<{ id: string; nombre: string } | null>(null);
   const [take, setTake] = useState<TakeEstado | null>(null);
+
+  const [voces, setVoces] = useState<Voz[]>([]);
+  const [presets, setPresets] = useState<SubtitlePresetInfo[]>([]);
+  const [vozElegida, setVozElegida] = useState<string>("");
+  const [presetElegido, setPresetElegido] = useState<string>("");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewCargando, setPreviewCargando] = useState(false);
+  const [renderJob, setRenderJob] = useState<RenderJobEstado | null>(null);
+
+  useEffect(() => {
+    fetch("/api/voces")
+      .then((r) => r.json())
+      .then((d) => {
+        setVoces(d.voces ?? []);
+        if (d.voces?.[0]) setVozElegida(d.voces[0].voiceId);
+      })
+      .catch(() => {});
+    fetch("/api/subtitulos/presets")
+      .then((r) => r.json())
+      .then((d) => {
+        setPresets(d.presets ?? []);
+        if (d.presets?.[0]) setPresetElegido(d.presets[0].nombre);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function previsualizarVoz() {
+    if (!vozElegida) return;
+    setPreviewCargando(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/voces/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voiceId: vozElegida }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Error");
+      const data: { url: string } = await res.json();
+      setPreviewUrl(data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPreviewCargando(false);
+    }
+  }
+
+  async function aplicarVozYSubtitulos() {
+    if (!take || take.estado !== "listo") return;
+    setCargando(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/escenas/${sceneIdDeTake()}/audio-subtitulos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voiceId: vozElegida, preset: presetElegido }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Error");
+      const data: { renderJob: RenderJobEstado } = await res.json();
+      setRenderJob(data.renderJob);
+      pollRenderJob(data.renderJob.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  function sceneIdDeTake(): string {
+    const primeraEscena = [...(resultado?.escenas ?? [])].sort(
+      (a, b) => a.orden - b.orden
+    )[0];
+    return primeraEscena?.id ?? "";
+  }
+
+  function pollRenderJob(id: string) {
+    const intervalo = setInterval(async () => {
+      const res = await fetch(`/api/render-jobs/${id}`);
+      if (!res.ok) return;
+      const data: { renderJob: RenderJobEstado } = await res.json();
+      setRenderJob(data.renderJob);
+      if (data.renderJob.estado === "listo" || data.renderJob.estado === "error") {
+        clearInterval(intervalo);
+      }
+    }, 4000);
+  }
 
   async function enviarTurno(texto: string) {
     const nuevoHistorial: ChatMessage[] = [
@@ -341,6 +447,83 @@ export default function EstudioPage() {
                 )}
                 {take.estado === "error" && (
                   <p className="mt-2 text-sm text-red-400">{take.notasQa}</p>
+                )}
+              </div>
+            )}
+
+            {take?.estado === "listo" && !renderJob && (
+              <div className="flex flex-col gap-4 rounded-lg border border-white/10 p-4">
+                <h3 className="font-semibold">Voz y subtítulos</h3>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm text-muted">Voz</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={vozElegida}
+                      onChange={(e) => setVozElegida(e.target.value)}
+                      className="flex-1 rounded-lg border border-white/20 bg-transparent px-3 py-2"
+                    >
+                      {voces.map((v) => (
+                        <option key={v.id} value={v.voiceId} className="bg-background">
+                          {v.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={previsualizarVoz}
+                      disabled={previewCargando || !vozElegida}
+                      className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
+                    >
+                      {previewCargando ? "Generando…" : "Escuchar preview"}
+                    </button>
+                  </div>
+                  {previewUrl && (
+                    // eslint-disable-next-line jsx-a11y/media-has-caption
+                    <audio controls src={previewUrl} className="w-full" />
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm text-muted">Preset de subtítulos</label>
+                  <select
+                    value={presetElegido}
+                    onChange={(e) => setPresetElegido(e.target.value)}
+                    className="rounded-lg border border-white/20 bg-transparent px-3 py-2"
+                  >
+                    {presets.map((p) => (
+                      <option key={p.id} value={p.nombre} className="bg-background">
+                        {p.nombre} — {p.config.descripcion}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={aplicarVozYSubtitulos}
+                  disabled={cargando || !vozElegida || !presetElegido}
+                  className="w-fit rounded-lg bg-accent px-4 py-2 font-medium disabled:opacity-50"
+                >
+                  {cargando ? "Enviando…" : "Aplicar voz y subtítulos"}
+                </button>
+              </div>
+            )}
+
+            {renderJob && (
+              <div className="rounded-lg border border-white/10 p-4">
+                <p className="font-mono text-sm">
+                  RenderJob <code>{renderJob.id}</code> — estado:{" "}
+                  <strong>{renderJob.estado}</strong> ({renderJob.progreso}%)
+                </p>
+                {renderJob.estado === "listo" && renderJob.url && (
+                  // eslint-disable-next-line jsx-a11y/media-has-caption
+                  <video
+                    controls
+                    src={renderJob.url}
+                    className="mt-3 w-full max-w-xs rounded-lg"
+                  />
+                )}
+                {renderJob.estado === "error" && (
+                  <p className="mt-2 text-sm text-red-400">{renderJob.error}</p>
                 )}
               </div>
             )}
