@@ -17,6 +17,12 @@ export default function Home() {
           </a>{" "}
           — estado de Postgres, Redis y media-engine
         </li>
+        <li>
+          <a className="underline hover:text-foreground" href="/estudio">
+            /estudio
+          </a>{" "}
+          — Fase 1: chat con el Entrevistador y storyboard
+        </li>
       </ul>
       <p className="text-sm text-muted">
         Las pantallas reales (Dashboard, Estudio, Storyboard, Biblioteca de
