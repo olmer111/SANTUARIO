@@ -1,4 +1,4 @@
-import type { CapacidadesProveedor, VideoProvider } from "./types.js";
+import type { CapacidadesProveedor, VideoProvider } from "./types";
 
 export interface EstadisticasProveedor {
   tasaExitoHistorica: number;
