@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type {
   Brief,
   ChatMessage,
@@ -8,6 +9,10 @@ import type {
   GuionSalida,
   RespuestaEntrevistador,
 } from "@santuario/shared";
+import { Panel, Eyebrow } from "@/components/ui/panel";
+import { Boton } from "@/components/ui/button";
+import { StatusDot } from "@/components/ui/status-dot";
+import { cn } from "@/lib/utils";
 
 type Fase = "entrevista" | "revision_guion" | "adn" | "listo";
 
@@ -212,10 +217,7 @@ export default function EstudioPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Error");
       const data = await res.json();
-      setResultado({
-        projectId: data.project.id,
-        escenas: data.scenes,
-      });
+      setResultado({ projectId: data.project.id, escenas: data.scenes });
       setFase("adn");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -246,9 +248,7 @@ export default function EstudioPage() {
 
   async function generarTomaPrueba() {
     if (!adn || !resultado) return;
-    const primeraEscena = [...resultado.escenas].sort(
-      (a, b) => a.orden - b.orden
-    )[0];
+    const primeraEscena = [...resultado.escenas].sort((a, b) => a.orden - b.orden)[0];
     if (!primeraEscena) return;
     setCargando(true);
     setError(null);
@@ -282,15 +282,20 @@ export default function EstudioPage() {
   }
 
   return (
-    <main className="mx-auto grid min-h-dvh max-w-5xl grid-cols-1 gap-8 px-6 py-10 md:grid-cols-[1fr_320px]">
+    <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-6 py-10 md:grid-cols-[1fr_300px]">
       <section className="flex flex-col gap-4">
-        <h1 className="text-2xl font-bold">Estudio</h1>
+        <header>
+          <Eyebrow>Estudio</Eyebrow>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">
+            Nuevo video
+          </h1>
+        </header>
 
         {fase === "entrevista" && (
-          <>
+          <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3">
               {historial.length === 0 && (
-                <p className="text-muted">
+                <p className="text-sm text-ink-muted">
                   Contame qué video querés hacer (tema, duración, plataforma,
                   lo que ya sepas — no te lo voy a volver a preguntar).
                 </p>
@@ -298,11 +303,12 @@ export default function EstudioPage() {
               {historial.map((m, i) => (
                 <div
                   key={i}
-                  className={
+                  className={cn(
+                    "max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm",
                     m.role === "user"
-                      ? "self-end rounded-lg bg-accent/20 px-3 py-2"
-                      : "self-start rounded-lg bg-white/5 px-3 py-2"
-                  }
+                      ? "self-end bg-tungsteno/15 text-ink"
+                      : "self-start bg-canvas-raised text-ink"
+                  )}
                 >
                   {m.content}
                 </div>
@@ -316,7 +322,7 @@ export default function EstudioPage() {
                     key={op}
                     onClick={() => enviarTurno(op)}
                     disabled={cargando}
-                    className="rounded-full border border-white/20 px-3 py-1 text-sm hover:bg-white/10"
+                    className="rounded-full border border-line px-3 py-1.5 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink disabled:opacity-40"
                   >
                     {op}
                   </button>
@@ -331,64 +337,55 @@ export default function EstudioPage() {
               }}
               className="flex gap-2"
             >
+              <label htmlFor="chat-input" className="sr-only">
+                Tu respuesta
+              </label>
               <input
+                id="chat-input"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={cargando}
                 placeholder="Escribí tu respuesta…"
-                className="flex-1 rounded-lg border border-white/20 bg-transparent px-3 py-2"
+                className="flex-1 rounded-lg border border-line bg-transparent px-3 py-2 text-base"
               />
-              <button
-                type="submit"
-                disabled={cargando || !input.trim()}
-                className="rounded-lg bg-accent px-4 py-2 font-medium disabled:opacity-50"
-              >
+              <Boton type="submit" disabled={cargando || !input.trim()}>
                 Enviar
-              </button>
+              </Boton>
             </form>
-          </>
+          </div>
         )}
 
         {fase === "revision_guion" && (
           <div className="flex flex-col gap-4">
-            <p className="text-muted">
+            <p className="text-sm text-ink-muted">
               Brief completo. Generá el guion propuesto para aprobarlo.
             </p>
             {!guion && (
-              <button
-                onClick={generarGuion}
-                disabled={cargando}
-                className="w-fit rounded-lg bg-accent px-4 py-2 font-medium disabled:opacity-50"
-              >
+              <Boton onClick={generarGuion} disabled={cargando} className="w-fit">
                 {cargando ? "Generando guion…" : "Generar guion"}
-              </button>
+              </Boton>
             )}
             {guion && (
               <div className="flex flex-col gap-4">
-                <h2 className="text-xl font-semibold">{guion.titulo}</h2>
-                <pre className="whitespace-pre-wrap rounded-lg bg-white/5 p-3 text-sm">
-                  {guion.guion}
-                </pre>
+                <h2 className="font-display text-xl font-medium">{guion.titulo}</h2>
+                <Panel>
+                  <pre className="whitespace-pre-wrap font-mono text-xs text-ink-muted">
+                    {guion.guion}
+                  </pre>
+                </Panel>
                 <div className="flex flex-col gap-2">
                   {guion.escenas.map((escena: EscenaGuion) => (
-                    <div
-                      key={escena.orden}
-                      className="rounded-lg border border-white/10 p-3 text-sm"
-                    >
-                      <p className="font-mono text-xs text-muted">
+                    <Panel key={escena.orden} className="p-3">
+                      <p className="font-mono text-[11px] text-ink-faint">
                         Escena {escena.orden + 1} · {escena.duracionSeg}s
                       </p>
-                      <p>{escena.descripcionVisual}</p>
-                    </div>
+                      <p className="text-sm">{escena.descripcionVisual}</p>
+                    </Panel>
                   ))}
                 </div>
-                <button
-                  onClick={aprobarGuion}
-                  disabled={cargando}
-                  className="w-fit rounded-lg bg-accent px-4 py-2 font-medium disabled:opacity-50"
-                >
+                <Boton onClick={aprobarGuion} disabled={cargando} className="w-fit">
                   {cargando ? "Guardando…" : "Aprobar guion"}
-                </button>
+                </Boton>
               </div>
             )}
           </div>
@@ -396,86 +393,82 @@ export default function EstudioPage() {
 
         {fase === "adn" && resultado && (
           <div className="flex flex-col gap-4">
-            <p className="text-muted">
-              Storyboard guardado — proyecto{" "}
-              <code className="font-mono">{resultado.projectId}</code> con{" "}
-              {resultado.escenas.length} escenas. Ahora creá el ADN de Estilo
-              (obligatorio: sin ADN no hay generación).
+            <p className="text-sm text-ink-muted">
+              Storyboard guardado con {resultado.escenas.length} escenas. Ahora
+              creá el ADN de Estilo — sin ADN no hay generación.
             </p>
 
             {!adn && (
-              <div className="flex gap-2">
+              <Panel className="flex flex-col gap-3 sm:flex-row">
+                <label htmlFor="descripcion-estilo" className="sr-only">
+                  Descripción del estilo
+                </label>
                 <input
+                  id="descripcion-estilo"
                   value={descripcionEstilo}
                   onChange={(e) => setDescripcionEstilo(e.target.value)}
                   disabled={cargando}
                   placeholder="Describí el look: ej. cinemático cálido, luz dorada, grano sutil…"
-                  className="flex-1 rounded-lg border border-white/20 bg-transparent px-3 py-2"
+                  className="flex-1 rounded-lg border border-line bg-transparent px-3 py-2 text-base"
                 />
-                <button
-                  onClick={crearADN}
-                  disabled={cargando || !descripcionEstilo.trim()}
-                  className="rounded-lg bg-accent px-4 py-2 font-medium disabled:opacity-50"
-                >
+                <Boton onClick={crearADN} disabled={cargando || !descripcionEstilo.trim()}>
                   {cargando ? "Creando…" : "Crear ADN"}
-                </button>
-              </div>
+                </Boton>
+              </Panel>
             )}
 
             {adn && !take && (
-              <div className="flex flex-col gap-2">
-                <p>
-                  ADN <strong>{adn.nombre}</strong> creado (versión 1).
+              <Panel className="flex flex-col gap-3">
+                <p className="text-sm">
+                  ADN <strong className="font-medium">{adn.nombre}</strong> creado
+                  (versión 1).
                 </p>
-                <button
-                  onClick={generarTomaPrueba}
-                  disabled={cargando}
-                  className="w-fit rounded-lg bg-accent px-4 py-2 font-medium disabled:opacity-50"
-                >
+                <Boton onClick={generarTomaPrueba} disabled={cargando} className="w-fit">
                   {cargando ? "Enviando…" : "Generar toma de prueba (escena 1)"}
-                </button>
-              </div>
+                </Boton>
+              </Panel>
             )}
 
             {take && (
-              <div className="rounded-lg border border-white/10 p-4">
-                <p className="font-mono text-sm">
-                  Take <code>{take.id}</code> — estado: <strong>{take.estado}</strong>
-                </p>
-                {take.estado === "listo" && take.archivo && (
-                  <p className="mt-2 text-sm text-muted">Archivo: {take.archivo}</p>
-                )}
+              <Panel>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs text-ink-faint">{take.id}</span>
+                  <StatusDot estado={take.estado} />
+                </div>
                 {take.estado === "error" && (
-                  <p className="mt-2 text-sm text-red-400">{take.notasQa}</p>
+                  <p className="mt-2 text-sm text-error">{take.notasQa}</p>
                 )}
-              </div>
+              </Panel>
             )}
 
             {take?.estado === "listo" && !renderJob && (
-              <div className="flex flex-col gap-4 rounded-lg border border-white/10 p-4">
-                <h3 className="font-semibold">Voz y subtítulos</h3>
+              <Panel className="flex flex-col gap-4">
+                <h3 className="font-display text-base font-medium">Voz y subtítulos</h3>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm text-muted">Voz</label>
+                  <label htmlFor="select-voz" className="text-sm text-ink-muted">
+                    Voz
+                  </label>
                   <div className="flex gap-2">
                     <select
+                      id="select-voz"
                       value={vozElegida}
                       onChange={(e) => setVozElegida(e.target.value)}
-                      className="flex-1 rounded-lg border border-white/20 bg-transparent px-3 py-2"
+                      className="flex-1 rounded-lg border border-line bg-transparent px-3 py-2 text-base"
                     >
                       {voces.map((v) => (
-                        <option key={v.id} value={v.voiceId} className="bg-background">
+                        <option key={v.id} value={v.voiceId} className="bg-canvas">
                           {v.nombre}
                         </option>
                       ))}
                     </select>
-                    <button
+                    <Boton
+                      variante="secundaria"
                       onClick={previsualizarVoz}
                       disabled={previewCargando || !vozElegida}
-                      className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
                     >
                       {previewCargando ? "Generando…" : "Escuchar preview"}
-                    </button>
+                    </Boton>
                   </div>
                   {previewUrl && (
                     // eslint-disable-next-line jsx-a11y/media-has-caption
@@ -484,71 +477,79 @@ export default function EstudioPage() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm text-muted">Preset de subtítulos</label>
+                  <label htmlFor="select-preset" className="text-sm text-ink-muted">
+                    Preset de subtítulos
+                  </label>
                   <select
+                    id="select-preset"
                     value={presetElegido}
                     onChange={(e) => setPresetElegido(e.target.value)}
-                    className="rounded-lg border border-white/20 bg-transparent px-3 py-2"
+                    className="rounded-lg border border-line bg-transparent px-3 py-2 text-base"
                   >
                     {presets.map((p) => (
-                      <option key={p.id} value={p.nombre} className="bg-background">
+                      <option key={p.id} value={p.nombre} className="bg-canvas">
                         {p.nombre} — {p.config.descripcion}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <button
+                <Boton
                   onClick={aplicarVozYSubtitulos}
                   disabled={cargando || !vozElegida || !presetElegido}
-                  className="w-fit rounded-lg bg-accent px-4 py-2 font-medium disabled:opacity-50"
+                  className="w-fit"
                 >
                   {cargando ? "Enviando…" : "Aplicar voz y subtítulos"}
-                </button>
-              </div>
+                </Boton>
+              </Panel>
             )}
 
             {renderJob && (
-              <div className="rounded-lg border border-white/10 p-4">
-                <p className="font-mono text-sm">
-                  RenderJob <code>{renderJob.id}</code> — estado:{" "}
-                  <strong>{renderJob.estado}</strong> ({renderJob.progreso}%)
-                </p>
+              <Panel className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs text-ink-faint">{renderJob.id}</span>
+                  <StatusDot estado={renderJob.estado === "listo" ? "listo" : renderJob.estado} />
+                </div>
                 {renderJob.estado === "listo" && renderJob.url && (
                   // eslint-disable-next-line jsx-a11y/media-has-caption
-                  <video
-                    controls
-                    src={renderJob.url}
-                    className="mt-3 w-full max-w-xs rounded-lg"
-                  />
+                  <video controls src={renderJob.url} className="max-w-xs rounded-lg" />
                 )}
                 {renderJob.estado === "error" && (
-                  <p className="mt-2 text-sm text-red-400">{renderJob.error}</p>
+                  <p className="text-sm text-error">{renderJob.error}</p>
                 )}
-              </div>
+                {resultado && (
+                  <Link href={`/proyectos/${resultado.projectId}`} className="w-fit">
+                    <Boton variante="secundaria">Ver proyecto completo</Boton>
+                  </Link>
+                )}
+              </Panel>
             )}
           </div>
         )}
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-error">
+            {error}
+          </p>
+        )}
       </section>
 
-      <aside className="rounded-lg border border-white/10 p-4">
-        <h2 className="mb-3 text-sm font-semibold tracking-widest text-muted">
-          BRIEF
-        </h2>
-        <dl className="flex flex-col gap-2 text-sm">
-          {Object.entries(brief).map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-muted">{k}</dt>
-              <dd>{String(v)}</dd>
-            </div>
-          ))}
-          {Object.keys(brief).length === 0 && (
-            <p className="text-muted">Aún vacío</p>
-          )}
-        </dl>
+      <aside>
+        <Panel>
+          <Eyebrow className="mb-3">Brief</Eyebrow>
+          <dl className="flex flex-col gap-2.5 text-sm">
+            {Object.entries(brief).map(([k, v]) => (
+              <div key={k}>
+                <dt className="font-mono text-[11px] text-ink-faint">{k}</dt>
+                <dd>{String(v)}</dd>
+              </div>
+            ))}
+            {Object.keys(brief).length === 0 && (
+              <p className="text-ink-faint">Aún vacío</p>
+            )}
+          </dl>
+        </Panel>
       </aside>
-    </main>
+    </div>
   );
 }
