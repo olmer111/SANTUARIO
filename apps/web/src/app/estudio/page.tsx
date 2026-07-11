@@ -232,7 +232,7 @@ export default function EstudioPage() {
       const res = await fetch("/api/adn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ descripcionEstilo }),
+        body: JSON.stringify({ descripcionEstilo, projectId: resultado?.projectId }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Error");
       const data = await res.json();

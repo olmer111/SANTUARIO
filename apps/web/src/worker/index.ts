@@ -2,15 +2,18 @@ import { Worker, type Job } from "bullmq";
 import { COLAS, type NombreCola } from "@santuario/shared";
 import { procesarGenerar } from "./procesar-generar";
 import { procesarTTS } from "./procesar-tts";
+import { procesarDirector } from "./procesar-director";
 import { prisma } from "../lib/db";
 
 /**
  * Worker Node de BullMQ — proceso separado de Next.js.
  * Arranque: `pnpm worker` (o `pnpm --filter @santuario/web worker` desde la raíz).
  *
- * Fase 2: "generar" tiene procesador real (Higgsfield).
+ * Fase 2: "generar" tiene procesador real (Higgsfield/fal.ai).
  * Fase 3: "tts" tiene procesador real (voz + transcripción + subtítulos).
- * subtitulos/montaje siguen siendo placeholder hasta la Fase 4.
+ * Fase 4: "montaje" tiene procesador real (Director: proyecto completo con
+ * continuidad, QA y fallback). "subtitulos" sigue siendo placeholder — su
+ * trabajo quedó absorbido dentro de "tts" (Fase 3) y "montaje" (Fase 4).
  */
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 const connection = { url: REDIS_URL };
@@ -25,7 +28,7 @@ const procesadores: Record<NombreCola, (job: Job) => Promise<unknown>> = {
   generar: procesarGenerar,
   tts: procesarTTS,
   subtitulos: procesarPlaceholder,
-  montaje: procesarPlaceholder,
+  montaje: procesarDirector,
 };
 
 const workers = Object.values(COLAS).map(
@@ -60,20 +63,26 @@ for (const worker of workers) {
       }
     }
 
-    if (worker.name === "tts") {
+    if (worker.name === "tts" || worker.name === "montaje") {
       const renderJobId = (job?.data as { renderJobId?: string })?.renderJobId;
       if (renderJobId) {
-        await prisma.renderJob
-          .update({
-            where: { id: renderJobId },
-            data: { estado: "error", error: err.message },
-          })
-          .catch(() => {});
+        // el Director ya deja el mensaje de escalación en renderJob.error
+        // antes de lanzar la excepción; esto es solo un respaldo para
+        // errores inesperados que no pasaron por ese camino.
+        const actual = await prisma.renderJob
+          .findUnique({ where: { id: renderJobId } })
+          .catch(() => null);
+        if (actual && actual.estado !== "error") {
+          await prisma.renderJob
+            .update({ where: { id: renderJobId }, data: { estado: "error", error: err.message } })
+            .catch(() => {});
+        }
+        const agente = worker.name === "tts" ? "voz_subtitulos" : "director";
         await prisma.agentLog
           .create({
             data: {
-              agente: "voz_subtitulos",
-              decision: `Job "tts" agotó reintentos para renderJob ${renderJobId}`,
+              agente,
+              decision: `Job "${worker.name}" agotó reintentos para renderJob ${renderJobId}`,
               contexto: { renderJobId, error: err.message },
             },
           })

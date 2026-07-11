@@ -1,9 +1,7 @@
 import type { Job } from "bullmq";
 import { prisma } from "../lib/db";
 import { getProviderRegistry } from "../lib/providers/registry";
-
-const MAX_INTENTOS_POLL = 60;
-const INTERVALO_POLL_MS = 5000;
+import { esperarResultado } from "../lib/proveedor-polling";
 
 /**
  * Procesa un job de la cola "generar": consulta el estado del proveedor
@@ -18,52 +16,39 @@ export async function procesarGenerar(job: Job<{ takeId: string }>) {
   if (!proveedor) throw new Error(`Proveedor ${take.proveedor} no está registrado`);
   if (!take.jobIdProveedor) throw new Error("Take sin jobIdProveedor");
 
-  for (let intento = 0; intento < MAX_INTENTOS_POLL; intento++) {
-    const estado = await proveedor.estado(take.jobIdProveedor);
-    await job.updateProgress(Math.min(95, (intento * 100) / MAX_INTENTOS_POLL));
+  const resultado = await esperarResultado(proveedor, take.jobIdProveedor, (pct) =>
+    job.updateProgress(pct)
+  );
 
-    if (estado === "listo") {
-      const ruta = await proveedor.descargar(take.jobIdProveedor);
-      const scene = await prisma.scene.update({
-        where: { id: take.sceneId },
-        data: { estado: "lista" },
-      });
-      await prisma.take.update({
-        where: { id: take.id },
-        data: { estado: "listo", archivo: ruta },
-      });
-      await prisma.asset.create({
-        data: { projectId: scene.projectId, takeId: take.id, tipo: "video", ruta },
-      });
-      await prisma.agentLog.create({
-        data: {
-          projectId: scene.projectId,
-          agente: "generador",
-          decision: `Toma ${take.intento} de la escena lista`,
-          contexto: { takeId: take.id, ruta },
-        },
-      });
-      return { ok: true, ruta };
-    }
-
-    if (estado === "error") {
-      await prisma.take.update({
-        where: { id: take.id },
-        data: { estado: "error", notasQa: "El proveedor reportó error o contenido nsfw" },
-      });
-      await prisma.scene.update({
-        where: { id: take.sceneId },
-        data: { estado: "error" },
-      });
-      throw new Error(`El proveedor reportó error para el take ${take.id}`);
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, INTERVALO_POLL_MS));
+  if (!resultado.ok) {
+    getProviderRegistry().registrarResultado(proveedor.id, false);
+    await prisma.take.update({
+      where: { id: take.id },
+      data: { estado: "error", notasQa: resultado.error },
+    });
+    await prisma.scene.update({ where: { id: take.sceneId }, data: { estado: "error" } });
+    throw new Error(resultado.error);
   }
 
+  getProviderRegistry().registrarResultado(proveedor.id, true);
+  const scene = await prisma.scene.update({
+    where: { id: take.sceneId },
+    data: { estado: "lista" },
+  });
   await prisma.take.update({
     where: { id: take.id },
-    data: { estado: "error", notasQa: "Tiempo de espera agotado" },
+    data: { estado: "listo", archivo: resultado.ruta },
   });
-  throw new Error(`Tiempo de espera agotado para el take ${take.id}`);
+  await prisma.asset.create({
+    data: { projectId: scene.projectId, takeId: take.id, tipo: "video", ruta: resultado.ruta },
+  });
+  await prisma.agentLog.create({
+    data: {
+      projectId: scene.projectId,
+      agente: "generador",
+      decision: `Toma ${take.intento} de la escena lista`,
+      contexto: { takeId: take.id, ruta: resultado.ruta },
+    },
+  });
+  return { ok: true, ruta: resultado.ruta };
 }

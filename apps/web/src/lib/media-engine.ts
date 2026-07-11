@@ -57,3 +57,29 @@ export function renderizarSubtitulos(params: {
     audio_path: params.audioPath,
   });
 }
+
+/** Extrae el último frame de una toma — encadenamiento de continuidad
+ * (sección 7, regla 2: técnica #1 para no perder el hilo entre tomas). */
+export function extraerUltimoFrame(videoPath: string, outputName?: string) {
+  return postJSON<{ path: string }>("/frames/last", {
+    video_path: videoPath,
+    output_name: outputName,
+  });
+}
+
+/** QA visual: compara la paleta dominante de dos frames (sección 7, regla 5). */
+export function compararFrames(frameAPath: string, frameBPath: string) {
+  return postJSON<{ paleta_a: string[]; paleta_b: string[]; similitud: number }>(
+    "/qa/comparar",
+    { frame_a_path: frameAPath, frame_b_path: frameBPath }
+  );
+}
+
+/** Concatena las tomas finales en el video del proyecto (sección 6, paso 9). */
+export function concatenarTomas(videoPaths: string[], outputName?: string) {
+  return postJSON<{ path: string }>("/render/concat", {
+    video_paths: videoPaths,
+    output_name: outputName,
+    normalizar_loudness: true,
+  });
+}
