@@ -9,7 +9,21 @@ import type {
   RespuestaEntrevistador,
 } from "@santuario/shared";
 
-type Fase = "entrevista" | "revision_guion" | "listo";
+type Fase = "entrevista" | "revision_guion" | "adn" | "listo";
+
+interface EscenaPersistida {
+  id: string;
+  orden: number;
+  descripcionVisual: string;
+  duracionSeg: number;
+}
+
+interface TakeEstado {
+  id: string;
+  estado: string;
+  archivo: string | null;
+  notasQa: string;
+}
 
 export default function EstudioPage() {
   const [fase, setFase] = useState<Fase>("entrevista");
@@ -23,8 +37,12 @@ export default function EstudioPage() {
   const [guion, setGuion] = useState<GuionSalida | null>(null);
   const [resultado, setResultado] = useState<{
     projectId: string;
-    escenas: number;
+    escenas: EscenaPersistida[];
   } | null>(null);
+
+  const [descripcionEstilo, setDescripcionEstilo] = useState("");
+  const [adn, setAdn] = useState<{ id: string; nombre: string } | null>(null);
+  const [take, setTake] = useState<TakeEstado | null>(null);
 
   async function enviarTurno(texto: string) {
     const nuevoHistorial: ChatMessage[] = [
@@ -90,14 +108,71 @@ export default function EstudioPage() {
       const data = await res.json();
       setResultado({
         projectId: data.project.id,
-        escenas: data.scenes.length,
+        escenas: data.scenes,
       });
-      setFase("listo");
+      setFase("adn");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setCargando(false);
     }
+  }
+
+  async function crearADN() {
+    if (!descripcionEstilo.trim()) return;
+    setCargando(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/adn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ descripcionEstilo }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Error");
+      const data = await res.json();
+      setAdn({ id: data.adn.id, nombre: data.adn.nombre });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function generarTomaPrueba() {
+    if (!adn || !resultado) return;
+    const primeraEscena = [...resultado.escenas].sort(
+      (a, b) => a.orden - b.orden
+    )[0];
+    if (!primeraEscena) return;
+    setCargando(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/escenas/${primeraEscena.id}/generar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adnId: adn.id }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Error");
+      const data: { take: TakeEstado } = await res.json();
+      setTake(data.take);
+      pollTake(data.take.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  function pollTake(takeId: string) {
+    const intervalo = setInterval(async () => {
+      const res = await fetch(`/api/takes/${takeId}`);
+      if (!res.ok) return;
+      const data: { take: TakeEstado } = await res.json();
+      setTake(data.take);
+      if (data.take.estado === "listo" || data.take.estado === "error") {
+        clearInterval(intervalo);
+      }
+    }, 4000);
   }
 
   return (
@@ -213,16 +288,62 @@ export default function EstudioPage() {
           </div>
         )}
 
-        {fase === "listo" && resultado && (
-          <div className="rounded-lg bg-white/5 p-4">
-            <p>
+        {fase === "adn" && resultado && (
+          <div className="flex flex-col gap-4">
+            <p className="text-muted">
               Storyboard guardado — proyecto{" "}
               <code className="font-mono">{resultado.projectId}</code> con{" "}
-              {resultado.escenas} escenas.
+              {resultado.escenas.length} escenas. Ahora creá el ADN de Estilo
+              (obligatorio: sin ADN no hay generación).
             </p>
-            <p className="mt-2 text-sm text-muted">
-              La generación real de tomas llega en la Fase 2.
-            </p>
+
+            {!adn && (
+              <div className="flex gap-2">
+                <input
+                  value={descripcionEstilo}
+                  onChange={(e) => setDescripcionEstilo(e.target.value)}
+                  disabled={cargando}
+                  placeholder="Describí el look: ej. cinemático cálido, luz dorada, grano sutil…"
+                  className="flex-1 rounded-lg border border-white/20 bg-transparent px-3 py-2"
+                />
+                <button
+                  onClick={crearADN}
+                  disabled={cargando || !descripcionEstilo.trim()}
+                  className="rounded-lg bg-accent px-4 py-2 font-medium disabled:opacity-50"
+                >
+                  {cargando ? "Creando…" : "Crear ADN"}
+                </button>
+              </div>
+            )}
+
+            {adn && !take && (
+              <div className="flex flex-col gap-2">
+                <p>
+                  ADN <strong>{adn.nombre}</strong> creado (versión 1).
+                </p>
+                <button
+                  onClick={generarTomaPrueba}
+                  disabled={cargando}
+                  className="w-fit rounded-lg bg-accent px-4 py-2 font-medium disabled:opacity-50"
+                >
+                  {cargando ? "Enviando…" : "Generar toma de prueba (escena 1)"}
+                </button>
+              </div>
+            )}
+
+            {take && (
+              <div className="rounded-lg border border-white/10 p-4">
+                <p className="font-mono text-sm">
+                  Take <code>{take.id}</code> — estado: <strong>{take.estado}</strong>
+                </p>
+                {take.estado === "listo" && take.archivo && (
+                  <p className="mt-2 text-sm text-muted">Archivo: {take.archivo}</p>
+                )}
+                {take.estado === "error" && (
+                  <p className="mt-2 text-sm text-red-400">{take.notasQa}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
