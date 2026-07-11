@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Tokens base provisionales — el design system definitivo llega en Fase 5
+   con los 5 skills de diseño (ui-ux-pro-max genera la dirección completa). */
+:root {
+  --background: #0b0b0f;
+  --foreground: #ededf2;
+  --muted: #8a8a96;
+  --accent: #e86a33;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}

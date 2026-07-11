@@ -1,0 +1,48 @@
+services:
+  postgres:
+    # mirror.gcr.io replica las imágenes oficiales de Docker Hub
+    image: mirror.gcr.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: santuario
+      POSTGRES_PASSWORD: santuario
+      POSTGRES_DB: santuario
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U santuario -d santuario"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: mirror.gcr.io/library/redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  media-engine:
+    build: ./apps/media-engine
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./storage:/storage
+    environment:
+      STORAGE_DIR: /storage
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+volumes:
+  pgdata:
+  redisdata:
