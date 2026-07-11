@@ -9,7 +9,7 @@ reglas duras del ADN de Estilo, el pipeline y el plan de fases.
 - ✅ Fase 0 — Fundaciones (monorepo, Next.js+Prisma, BullMQ, media-engine, compose)
 - ✅ Fase 1 — Cerebro (Entrevistador + Guionista + storyboard, cerebro NVIDIA NIM)
 - ✅ Fase 2 — Primer video real (ADN + adaptador Higgsfield, sin credenciales aún)
-- ⏳ Fase 3 — Audio y subtítulos (edge-tts, faster-whisper, ASS)
+- ✅ Fase 3 — Audio y subtítulos (edge-tts, faster-whisper, ASS, sin red en sandbox)
 - ⏳ Fase 4 — Escala y consistencia (multi-proveedor, último-frame, QA)
 - ⏳ Fase 5 — Producto (UI completa con los 5 skills de diseño)
 
@@ -70,3 +70,16 @@ pnpm build                   # build completo
   y el patrón de auth lo están (ver comentarios en
   `apps/web/src/lib/providers/higgsfield.ts`); verificar contra el dashboard
   real antes de asumir que funciona en producción.
+- `speech.platform.bing.com` (backend de edge-tts) y `huggingface.co`
+  (descarga del modelo de faster-whisper) tampoco tienen salida — ni
+  siquiera desde contenedores Docker enrutando por el proxy del host
+  (`--network host` + `HTTPS_PROXY` tampoco funcionó: connection refused,
+  el proxy del host no es alcanzable desde dentro del contenedor anidado).
+  Lo que SÍ es 100% verificable en sandbox y quedó probado con capturas
+  reales: generación de `.ass` y burn-in con FFmpeg/libass (los 5 presets).
+  Nota para el próximo que toque esto: **libass no encuentra fuentes en
+  `python:3.11-slim`** — sin `fontsdir=` apuntando a fuentes reales
+  (DejaVu, empaquetadas vía matplotlib en un stage de build separado, ver
+  `apps/media-engine/Dockerfile`), el texto queda invisible aunque FFmpeg
+  termine con éxito y sin errores. Ya está resuelto, pero es la clase de
+  bug que no se nota sin extraer un frame y mirarlo.
