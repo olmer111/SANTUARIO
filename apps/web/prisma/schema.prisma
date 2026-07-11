@@ -1,0 +1,271 @@
+// SANTUARIO — modelo de datos (sección 10 del prompt maestro)
+// Postgres + Prisma. El ADN de Estilo vive en JSONB con versionado inmutable.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Usuarios y proyectos ----------
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String?
+  nombre       String?
+  createdAt    DateTime  @default(now())
+  projects     Project[]
+
+  @@map("users")
+}
+
+enum ProjectEstado {
+  borrador
+  entrevista
+  guion
+  storyboard
+  generando
+  qa
+  montaje
+  listo
+  error
+}
+
+model Project {
+  id                  String        @id @default(cuid())
+  titulo              String
+  tema                String
+  formato             String        @default("9:16") // 9:16 | 16:9 | 1:1
+  duracionObjetivoSeg Int           @default(60)
+  estado              ProjectEstado @default(borrador)
+  // ADN + versión exacta usada (el ADN nunca se sobrescribe)
+  adnId               String?
+  adn                 StyleDna?     @relation(fields: [adnId], references: [id])
+  modoAutonomo        Boolean       @default(false)
+  userId              String?
+  user                User?         @relation(fields: [userId], references: [id])
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  scripts    Script[]
+  scenes     Scene[]
+  assets     Asset[]
+  renderJobs RenderJob[]
+  agentLogs  AgentLog[]
+
+  @@map("projects")
+}
+
+// ---------- ADN de Estilo (versionado, inmutable) ----------
+
+model StyleDna {
+  id        String     @id @default(cuid())
+  nombre    String
+  version   Int        @default(1)
+  // Versionado: cada cambio crea una fila nueva que apunta a su padre.
+  parentId  String?
+  parent    StyleDna?  @relation("versiones", fields: [parentId], references: [id])
+  hijos     StyleDna[] @relation("versiones")
+  // El documento completo del ADN (prompt_base, negative, personajes, paleta…)
+  data      Json
+  createdAt DateTime   @default(now())
+  projects  Project[]
+
+  @@unique([nombre, version])
+  @@map("style_dna")
+}
+
+// ---------- Guion y escenas ----------
+
+model Script {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revision  Int      @default(1)
+  guion     String // guion completo
+  narracion String // texto de narración para TTS
+  aprobado  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  scenes    Scene[]
+
+  @@unique([projectId, revision])
+  @@map("scripts")
+}
+
+enum SceneEstado {
+  pendiente
+  generando
+  qa
+  lista
+  error
+}
+
+model Scene {
+  id                String      @id @default(cuid())
+  projectId         String
+  project           Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scriptId          String?
+  script            Script?     @relation(fields: [scriptId], references: [id])
+  orden             Int
+  descripcionVisual String
+  duracionSeg       Float // 5–10 s por regla de consistencia
+  textoNarracion    String      @default("")
+  personajes        String[]    @default([])
+  estado            SceneEstado @default(pendiente)
+  takes             Take[]
+
+  @@unique([projectId, orden])
+  @@map("scenes")
+}
+
+enum TakeEstado {
+  cola
+  procesando
+  listo
+  qa_fallo
+  error
+}
+
+// Cada intento de generación por escena: trazabilidad total (regla 6).
+model Take {
+  id             String     @id @default(cuid())
+  sceneId        String
+  scene          Scene      @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  intento        Int        @default(1)
+  promptExacto   String // prompt enviado, palabra por palabra
+  negativePrompt String     @default("")
+  seed           Int?
+  proveedor      String
+  jobIdProveedor String?
+  adnVersion     Int
+  estado         TakeEstado @default(cola)
+  archivo        String?
+  notasQa        String     @default("")
+  createdAt      DateTime   @default(now())
+  assets         Asset[]
+
+  @@map("takes")
+}
+
+// ---------- Assets ----------
+
+enum AssetTipo {
+  video
+  audio
+  frame_referencia
+  subtitulo
+  imagen
+  export_final
+}
+
+model Asset {
+  id        String    @id @default(cuid())
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  takeId    String?
+  take      Take?     @relation(fields: [takeId], references: [id])
+  tipo      AssetTipo
+  ruta      String
+  checksum  String?
+  metadatos Json?
+  createdAt DateTime  @default(now())
+
+  @@map("assets")
+}
+
+// ---------- Cola de render ----------
+
+enum RenderJobTipo {
+  generar
+  tts
+  subtitulos
+  montaje
+}
+
+enum RenderJobEstado {
+  cola
+  procesando
+  listo
+  error
+}
+
+model RenderJob {
+  id        String          @id @default(cuid())
+  projectId String?
+  project   Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tipo      RenderJobTipo
+  estado    RenderJobEstado @default(cola)
+  progreso  Int             @default(0)
+  datos     Json?
+  error     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@map("render_jobs")
+}
+
+// ---------- Proveedores y cuotas ----------
+
+model Provider {
+  id                 String         @id // slug: higgsfield, fal, replicate…
+  nombre             String
+  // credenciales cifradas; NUNCA en el código
+  credencialCifrada  String?
+  activo             Boolean        @default(true)
+  capacidades        Json?
+  quota              ProviderQuota?
+
+  @@map("providers")
+}
+
+model ProviderQuota {
+  id            String   @id @default(cuid())
+  providerId    String   @unique
+  provider      Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  cuotaRestante Int      @default(0)
+  tasaExito     Float    @default(1)
+  actualizadoEn DateTime @updatedAt
+
+  @@map("provider_quota")
+}
+
+// ---------- Catálogos elegibles por el usuario ----------
+
+model SubtitlePreset {
+  id        String  @id @default(cuid())
+  nombre    String  @unique // impacto_tiktok, karaoke, minimal, neon, documental…
+  config    Json // fuente, tamaño, colores, borde, posición, animación
+  esSistema Boolean @default(false)
+
+  @@map("subtitle_presets")
+}
+
+model Voice {
+  id     String @id @default(cuid())
+  nombre String
+  idioma String // es-MX, es-CO, es-ES, es-AR…
+  motor  String // edge-tts | piper | kokoro | elevenlabs
+  voiceId String // p.ej. es-MX-JorgeNeural
+
+  @@unique([motor, voiceId])
+  @@map("voices")
+}
+
+// ---------- Trazabilidad de agentes ----------
+
+model AgentLog {
+  id        String   @id @default(cuid())
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agente    String // director, entrevistador, guionista, guardian_estilo…
+  decision  String // qué decidió
+  contexto  Json? // por qué (estructurado)
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@map("agent_logs")
+}

@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+/*
+ * Design system de SANTUARIO — "sala de grading".
+ * El producto es un estudio de post-producción de video con IA: paneles
+ * oscuros cálidos como una sala de corrección de color, no negro puro.
+ * Dos acentos con significado propio (no decoración):
+ *   - tungsteno (ámbar): la luz "REC" — acciones, estados activos/en vivo.
+ *   - scope (teal): lecturas técnicas — similitud de QA, cuotas, datos.
+ * Toda cifra técnica (seed, prompt, ids, similitud) va en monoespaciada,
+ * como un HUD de cámara — es contenido real que ya mostramos en cada
+ * pantalla, no un capricho tipográfico.
+ */
+
+:root {
+  --canvas: #131215;
+  --canvas-raised: #1c1a1e;
+  --canvas-overlay: #232025;
+  --line: #322e33;
+  --ink: #ede9e3;
+  --ink-muted: #9b9590;
+  --ink-faint: #8c867f; /* contraste AA verificado: 5.2:1 sobre --canvas */
+
+  --tungsteno: #e8963d;
+  --tungsteno-ink: #2a1a06;
+  --scope: #3fb6ad;
+  --scope-ink: #06211f;
+  --error: #e05a4e;
+  --error-ink: #2b0f0c;
+
+  --font-display: var(--font-display, ui-sans-serif);
+  --font-body: var(--font-body, ui-sans-serif);
+  --font-mono: var(--font-mono, ui-monospace);
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-canvas-raised: var(--canvas-raised);
+  --color-canvas-overlay: var(--canvas-overlay);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-tungsteno: var(--tungsteno);
+  --color-tungsteno-ink: var(--tungsteno-ink);
+  --color-scope: var(--scope);
+  --color-scope-ink: var(--scope-ink);
+  --color-error: var(--error);
+  --color-error-ink: var(--error-ink);
+
+  /* alias retrocompatibles usados por /estudio hasta que se migre */
+  --color-background: var(--canvas);
+  --color-foreground: var(--ink);
+  --color-muted: var(--ink-muted);
+  --color-accent: var(--tungsteno);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+code, .font-mono {
+  font-family: var(--font-mono);
+}
+
+/* foco visible siempre — regla dura de accesibilidad, no negociable */
+:focus-visible {
+  outline: 2px solid var(--tungsteno);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* pulso sutil para el indicador "en vivo" (cola/procesando) — la única
+   animación ambiental del sistema; todo lo demás es transición puntual. */
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.animate-rec {
+  animation: rec-pulse 1.6s ease-in-out infinite;
+}
