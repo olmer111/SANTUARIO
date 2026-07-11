@@ -1,0 +1,34 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# env — nunca credenciales en el código
+.env
+.env.local
+.env*.local
+
+# prisma
+apps/web/src/generated/
+
+# assets generados (quedan fuera del repo)
+storage/*
+!storage/.gitkeep
+
+# CA del proxy de egreso (solo entornos sandbox/CI; nunca al repo)
+apps/media-engine/ca-bundle.crt
+
+# misc
+*.log
+.DS_Store
+*.tsbuildinfo

@@ -1,0 +1,28 @@
+{
+  "name": "santuario",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SANTUARIO — plataforma web multi-agente para producir videos completos con IA",
+  "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "sharp",
+      "msgpackr-extract"
+    ]
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @santuario/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "worker": "pnpm --filter @santuario/web worker",
+    "db:migrate": "pnpm --filter @santuario/web db:migrate",
+    "db:generate": "pnpm --filter @santuario/web db:generate"
+  }
+}
