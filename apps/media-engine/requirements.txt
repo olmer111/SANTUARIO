@@ -5,7 +5,8 @@ python-multipart>=0.0.12
 
 # Fase 3 — voz (gratis, voces neuronales es-MX/es-CO/es-ES/es-AR)
 edge-tts>=7.0
+mutagen>=1.47  # duración de audio sin depender de ffprobe
 
-# Fase 3 — subtítulos palabra por palabra (se activa en Fase 3; pesa ~600 MB
-# por ctranslate2. Descomentar al llegar a esa fase.)
-# faster-whisper>=1.1
+# Fase 3 — subtítulos palabra por palabra (~600 MB por ctranslate2; el modelo
+# en sí se descarga la primera vez desde Hugging Face Hub, cacheado luego)
+faster-whisper>=1.1
