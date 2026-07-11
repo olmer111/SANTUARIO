@@ -1,0 +1,11 @@
+# Fase 0 — base del servicio
+fastapi>=0.115
+uvicorn[standard]>=0.32
+python-multipart>=0.0.12
+
+# Fase 3 — voz (gratis, voces neuronales es-MX/es-CO/es-ES/es-AR)
+edge-tts>=7.0
+
+# Fase 3 — subtítulos palabra por palabra (se activa en Fase 3; pesa ~600 MB
+# por ctranslate2. Descomentar al llegar a esa fase.)
+# faster-whisper>=1.1
